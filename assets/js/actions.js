@@ -8,7 +8,8 @@
 
 class ActionsManager {
     constructor() {
-        this.apiUrl = '/app/api/actions/handler.php';
+        // Use relative path from the app root
+        this.apiUrl = 'api/actions/handler.php';
         this.csrfToken = this.getCSRFToken();
         this.init();
     }
