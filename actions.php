@@ -436,6 +436,6 @@ include INCLUDES_PATH . '/header.php';
 </div>
 
 <!-- تحميل JavaScript -->
-<script src="<?= asset('js/actions.js') ?>?v=<?= time() ?>"></script>
+<script src="<?= asset('js/actions.js') ?>?v=<?= APP_VERSION ?>"></script>
 
 <?php include INCLUDES_PATH . '/footer.php'; ?>

@@ -65,12 +65,17 @@ function createActionFromLeaveRequest(int $leaveId, array $leaveData = []): ?int
         ]);
         
         if ($approverId) {
-            Database::insert('action_approvals', [
-                'action_id' => $actionId,
-                'level' => 1,
-                'approver_id' => $approverId,
-                'status' => 'pending'
-            ]);
+            try {
+                Database::insert('action_approvals', [
+                    'action_id' => $actionId,
+                    'level' => 1,
+                    'approver_id' => $approverId,
+                    'status' => 'pending'
+                ]);
+            } catch (Exception $e) {
+                error_log("Failed to create action approval: " . $e->getMessage());
+                // Continue anyway - the action was created successfully
+            }
             
             sendActionNotification($approverId, 'طلب إجازة جديد', "طلب من {$leaveData['full_name']}", $actionId);
         }
@@ -136,6 +141,13 @@ function syncLeaveWithAction(int $actionId, string $newStatus, ?string $notes = 
  */
 function sendActionNotification(int $userId, string $title, string $message, int $actionId): bool {
     try {
+        // Check if notifications table exists
+        $tableExists = Database::fetchOne("SHOW TABLES LIKE 'notifications'");
+        if (!$tableExists) {
+            error_log("Notifications table does not exist, skipping notification");
+            return false;
+        }
+        
         Database::insert('notifications', [
             'user_id' => $userId,
             'title' => $title,
@@ -147,6 +159,7 @@ function sendActionNotification(int $userId, string $title, string $message, int
         ]);
         return true;
     } catch (Exception $e) {
+        error_log("sendActionNotification Error: " . $e->getMessage());
         return false;
     }
 }
