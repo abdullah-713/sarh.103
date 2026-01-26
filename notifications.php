@@ -32,7 +32,7 @@ if (isset($_POST['mark_all_read']) && verify_csrf($_POST[CSRF_TOKEN_NAME] ?? '')
 if (isset($_GET['mark_read']) && is_numeric($_GET['mark_read'])) {
     try {
         Database::query("UPDATE notifications SET is_read = 1, read_at = NOW() WHERE id = ? AND user_id = ?", [$_GET['mark_read'], $userId]);
-        $unread = Database::fetch("SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0", [$userId]);
+        $unread = Database::fetchOne("SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0", [$userId]);
         $_SESSION['unread_notifications'] = $unread['cnt'] ?? 0;
     } catch (Exception $e) {}
     redirect(url('notifications.php'));
