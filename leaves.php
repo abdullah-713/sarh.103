@@ -190,14 +190,55 @@ include INCLUDES_PATH . '/header.php';
 </div>
 
 <script>
-document.getElementById('leaveForm').addEventListener('submit', function(e) {
+document.getElementById('leaveForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    Swal.fire({
-        icon: 'info',
-        title: 'قيد التطوير',
-        text: 'هذه الميزة قيد التطوير حالياً',
-        confirmButtonText: 'حسناً'
-    });
+    
+    const formData = new FormData(this);
+    const data = {
+        action: 'create',
+        leave_type_id: formData.get('leave_type_id'),
+        start_date: formData.get('start_date'),
+        end_date: formData.get('end_date'),
+        reason: formData.get('reason')
+    };
+    
+    try {
+        const response = await fetch('<?= url('api/leaves/handler.php') ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '<?= csrf_token() ?>'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'تم بنجاح',
+                text: result.message,
+                confirmButtonText: 'حسناً'
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'خطأ',
+                text: result.message,
+                confirmButtonText: 'حسناً'
+            });
+        }
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'خطأ',
+            text: 'حدث خطأ أثناء إرسال الطلب',
+            confirmButtonText: 'حسناً'
+        });
+    }
 });
 </script>
 

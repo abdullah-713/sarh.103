@@ -121,3 +121,12 @@ INSERT INTO `action_templates` (`name`, `type`, `category`, `description_templat
 ('اقتراح تطوير', 'suggestion', 'improvement', 'اقتراح', 1, 168),
 ('مهمة إدارية', 'task', 'admin', 'مهمة', 0, NULL),
 ('طلب مستلزمات', 'request', 'supplies', 'طلب مستلزمات', 1, 24);
+
+-- =====================================================
+-- إضافة عمود action_id لجدول الإجازات
+-- Add action_id column to leaves table
+-- =====================================================
+ALTER TABLE `leaves` 
+ADD COLUMN `action_id` INT UNSIGNED NULL AFTER `status`,
+ADD INDEX `idx_action_id` (`action_id`),
+ADD CONSTRAINT `fk_leave_action` FOREIGN KEY (`action_id`) REFERENCES `actions`(`id`) ON DELETE SET NULL;
