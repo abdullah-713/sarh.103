@@ -190,14 +190,44 @@ include INCLUDES_PATH . '/header.php';
 </div>
 
 <script>
-document.getElementById('leaveForm').addEventListener('submit', function(e) {
+const CSRF_TOKEN = '<?= csrf_token() ?>';
+
+document.getElementById('leaveForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    Swal.fire({
-        icon: 'info',
-        title: 'قيد التطوير',
-        text: 'هذه الميزة قيد التطوير حالياً',
-        confirmButtonText: 'حسناً'
-    });
+    
+    const formData = new FormData(this);
+    const data = {
+        action: 'create',
+        leave_type_id: formData.get('leave_type_id'),
+        start_date: formData.get('start_date'),
+        end_date: formData.get('end_date'),
+        reason: formData.get('reason') || ''
+    };
+    
+    if (!data.leave_type_id || !data.start_date || !data.end_date) {
+        Swal.fire({ icon: 'error', title: 'خطأ', text: 'يرجى ملء جميع الحقول المطلوبة' });
+        return;
+    }
+    
+    Swal.fire({ title: 'جاري الإرسال...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    
+    try {
+        const response = await fetch('<?= url("/api/leaves/handler.php") ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            Swal.fire({ icon: 'success', title: 'تم الإرسال', text: result.message }).then(() => location.reload());
+        } else {
+            Swal.fire({ icon: 'error', title: 'خطأ', text: result.message });
+        }
+    } catch (error) {
+        Swal.fire({ icon: 'error', title: 'خطأ في الاتصال', text: 'تعذر الاتصال بالخادم' });
+    }
 });
 </script>
 
