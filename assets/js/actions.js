@@ -21,7 +21,7 @@ const ActionsApp = {
      */
     async loadStats() {
         try {
-            const response = await fetch('/api/actions/handler.php', {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ const ActionsApp = {
         showLoading('جاري التحميل...');
         
         try {
-            const response = await fetch('/api/actions/handler.php', {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -137,7 +137,7 @@ const ActionsApp = {
         showLoading('جاري التحميل...');
         
         try {
-            const response = await fetch('/api/actions/handler.php', {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ const ActionsApp = {
         showLoading('جاري الإرسال...');
         
         try {
-            const response = await fetch('/api/actions/handler.php', {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -275,7 +275,7 @@ const ActionsApp = {
         showLoading('جاري الحفظ...');
         
         try {
-            const response = await fetch('/api/actions/handler.php', {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

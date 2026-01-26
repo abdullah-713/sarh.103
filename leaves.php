@@ -190,7 +190,7 @@ include INCLUDES_PATH . '/header.php';
 </div>
 
 <script>
-const CSRF_TOKEN = '<?= generate_csrf() ?>';
+const CSRF_TOKEN = '<?= csrf_token() ?>';
 
 document.getElementById('leaveForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -212,7 +212,7 @@ document.getElementById('leaveForm').addEventListener('submit', async function(e
     Swal.fire({ title: 'جاري الإرسال...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
     try {
-        const response = await fetch('/api/leaves/handler.php', {
+        const response = await fetch('<?= url("/api/leaves/handler.php") ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify(data)
