@@ -421,11 +421,11 @@ include INCLUDES_PATH . '/header.php';
         <div class="details-section">
             <h6><i class="bi bi-gear me-2"></i>إجراءات</h6>
             <div class="d-grid gap-2">
-                <button class="btn btn-success btn-sm" onclick="ActionsApp.changeStatus('approved')">
+                <button class="btn btn-success btn-sm" id="approveActionBtn" data-action="approved">
                     <i class="bi bi-check-circle me-1"></i>
                     الموافقة
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="ActionsApp.changeStatus('rejected')">
+                <button class="btn btn-danger btn-sm" id="rejectActionBtn" data-action="rejected">
                     <i class="bi bi-x-circle me-1"></i>
                     الرفض
                 </button>

@@ -98,7 +98,7 @@ const ActionsApp = {
         }
         
         const html = actions.map(action => `
-            <div class="action-card" data-id="${action.id}" onclick="ActionsApp.viewActionDetails(${action.id})">
+            <div class="action-card" data-action-id="${action.id}">
                 <div class="action-header">
                     <div class="d-flex align-items-start gap-3">
                         <div class="action-icon ${this.getStatusColor(action.status)}">
@@ -127,6 +127,16 @@ const ActionsApp = {
         `).join('');
         
         container.innerHTML = html;
+        
+        // Attach click event listeners
+        container.querySelectorAll('.action-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const actionId = parseInt(card.dataset.actionId);
+                if (actionId) {
+                    this.viewActionDetails(actionId);
+                }
+            });
+        });
     },
     
     /**
@@ -327,6 +337,21 @@ const ActionsApp = {
         // زر إضافة تعليق
         document.getElementById('addCommentBtn')?.addEventListener('click', () => {
             this.addComment();
+        });
+        
+        // أزرار الموافقة والرفض
+        document.getElementById('approveActionBtn')?.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action) {
+                this.changeStatus(action);
+            }
+        });
+        
+        document.getElementById('rejectActionBtn')?.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action) {
+                this.changeStatus(action);
+            }
         });
     },
     

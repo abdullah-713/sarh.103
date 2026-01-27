@@ -4,7 +4,9 @@
  * دوال ربط نظام الإجراءات مع الأنظمة الأخرى
  */
 
-defined('SARH_SYSTEM') || define('SARH_SYSTEM', true);
+if (!defined('SARH_SYSTEM')) {
+    define('SARH_SYSTEM', true);
+}
 
 /**
  * توليد كود فريد للإجراء
