@@ -1,405 +1,454 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
- * نظام صرح الإتقان - Actions Management JavaScript
- * Sarh Al-Itqan - Actions & Tasks Management Client-Side Logic
- * ═══════════════════════════════════════════════════════════════════════════════
- * @version 1.0.0
+ * SARH SYSTEM - ACTIONS JAVASCRIPT
+ * JavaScript للتفاعل مع API الإجراءات
  */
 
-class ActionsManager {
-    constructor() {
-        // Use relative path from the app root
-        this.apiUrl = 'api/actions/handler.php';
-        this.csrfToken = this.getCSRFToken();
-        this.init();
-    }
-
+const ActionsApp = {
+    currentFilter: 'my',
+    currentActionId: null,
+    
     /**
-     * Initialize the actions manager
+     * تهيئة التطبيق
      */
     init() {
-        console.log('ActionsManager initialized');
-        this.setupEventListeners();
-        this.startAutoRefresh();
-    }
-
+        this.loadStats();
+        this.loadActions();
+        this.attachEventListeners();
+    },
+    
     /**
-     * Get CSRF token from meta tag or form
+     * تحميل الإحصائيات
      */
-    getCSRFToken() {
-        const metaTag = document.querySelector('meta[name="csrf-token"]');
-        if (metaTag) {
-            return metaTag.content;
-        }
-        
-        const hiddenInput = document.querySelector('input[name="sarh_csrf_token"]');
-        if (hiddenInput) {
-            return hiddenInput.value;
-        }
-        
-        return '';
-    }
-
-    /**
-     * Setup event listeners
-     */
-    setupEventListeners() {
-        // Action creation form
-        const createForm = document.getElementById('newActionForm');
-        if (createForm) {
-            createForm.addEventListener('submit', (e) => this.handleCreateAction(e));
-        }
-
-        // Action update forms
-        document.querySelectorAll('.action-update-form').forEach(form => {
-            form.addEventListener('submit', (e) => this.handleUpdateAction(e));
-        });
-
-        // Approve/Reject buttons
-        document.querySelectorAll('.btn-approve-action').forEach(btn => {
-            btn.addEventListener('click', (e) => this.handleApproveAction(e));
-        });
-
-        document.querySelectorAll('.btn-reject-action').forEach(btn => {
-            btn.addEventListener('click', (e) => this.handleRejectAction(e));
-        });
-
-        // Comment forms
-        document.querySelectorAll('.action-comment-form').forEach(form => {
-            form.addEventListener('submit', (e) => this.handleAddComment(e));
-        });
-    }
-
-    /**
-     * Make API request
-     */
-    async apiRequest(action, data = {}) {
+    async loadStats() {
         try {
-            const response = await fetch(this.apiUrl, {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': this.csrfToken
+                    'X-CSRF-Token': SARH.csrfToken
                 },
-                body: JSON.stringify({ action, ...data })
+                body: JSON.stringify({ action: 'stats' })
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            
             const result = await response.json();
-            return result;
-
-        } catch (error) {
-            console.error('API request failed:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Handle create action
-     */
-    async handleCreateAction(event) {
-        event.preventDefault();
-        
-        const form = event.target;
-        const formData = new FormData(form);
-        
-        const data = {
-            type: formData.get('type'),
-            title: formData.get('title'),
-            description: formData.get('description'),
-            priority: formData.get('priority'),
-            category: formData.get('category'),
-            due_date: formData.get('due_date')
-        };
-
-        try {
-            const result = await this.apiRequest('create', data);
-
+            
             if (result.success) {
-                this.showSuccess('تم إنشاء الإجراء بنجاح');
-                
-                // Close modal if exists
-                const modal = bootstrap.Modal.getInstance(document.getElementById('newActionModal'));
-                if (modal) modal.hide();
-
-                // Reload or update list
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                this.showError(result.message || 'فشل في إنشاء الإجراء');
+                const stats = result.data;
+                document.getElementById('statPending').textContent = stats.pending || 0;
+                document.getElementById('statInProgress').textContent = stats.in_progress || 0;
+                document.getElementById('statWaitingApproval').textContent = stats.waiting_approval || 0;
+                document.getElementById('statCompleted').textContent = stats.completed || 0;
             }
         } catch (error) {
-            this.showError('حدث خطأ في الاتصال بالخادم');
+            console.error('Error loading stats:', error);
         }
-    }
-
+    },
+    
     /**
-     * Handle update action
+     * تحميل قائمة الإجراءات
      */
-    async handleUpdateAction(event) {
-        event.preventDefault();
+    async loadActions(filter = null) {
+        if (filter) this.currentFilter = filter;
         
-        const form = event.target;
-        const formData = new FormData(form);
-        const actionId = formData.get('action_id');
+        showLoading('جاري التحميل...');
         
-        const data = {
-            action_id: actionId,
-            title: formData.get('title'),
-            description: formData.get('description'),
-            priority: formData.get('priority'),
-            status: formData.get('status'),
-            assigned_to: formData.get('assigned_to')
-        };
-
         try {
-            const result = await this.apiRequest('update', data);
-
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': SARH.csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'list',
+                    view: this.currentFilter,
+                    per_page: 50
+                })
+            });
+            
+            const result = await response.json();
+            hideLoading();
+            
             if (result.success) {
-                this.showSuccess('تم تحديث الإجراء بنجاح');
-                setTimeout(() => location.reload(), 1500);
+                this.renderActionsList(result.data);
             } else {
-                this.showError(result.message || 'فشل في تحديث الإجراء');
+                showError('فشل تحميل الإجراءات');
             }
         } catch (error) {
-            this.showError('حدث خطأ في الاتصال بالخادم');
+            hideLoading();
+            showError('خطأ في الاتصال بالخادم');
+            console.error('Error loading actions:', error);
         }
-    }
-
+    },
+    
     /**
-     * Handle approve action
+     * عرض قائمة الإجراءات
      */
-    async handleApproveAction(event) {
-        event.preventDefault();
+    renderActionsList(actions) {
+        const container = document.getElementById('actionsListContainer');
         
-        const button = event.target.closest('.btn-approve-action');
-        const actionId = button.dataset.actionId;
-
-        const { value: notes } = await Swal.fire({
-            title: 'الموافقة على الإجراء',
-            input: 'textarea',
-            inputLabel: 'ملاحظات (اختياري)',
-            inputPlaceholder: 'أضف ملاحظاتك هنا...',
-            showCancelButton: true,
-            confirmButtonText: 'موافق',
-            cancelButtonText: 'إلغاء',
-            confirmButtonColor: '#28a745'
-        });
-
-        if (notes !== undefined) {
-            try {
-                const result = await this.apiRequest('approve', {
-                    action_id: actionId,
-                    notes: notes || ''
-                });
-
-                if (result.success) {
-                    this.showSuccess('تمت الموافقة على الإجراء');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    this.showError(result.message || 'فشلت الموافقة على الإجراء');
-                }
-            } catch (error) {
-                this.showError('حدث خطأ في الاتصال بالخادم');
-            }
-        }
-    }
-
-    /**
-     * Handle reject action
-     */
-    async handleRejectAction(event) {
-        event.preventDefault();
-        
-        const button = event.target.closest('.btn-reject-action');
-        const actionId = button.dataset.actionId;
-
-        const { value: notes } = await Swal.fire({
-            title: 'رفض الإجراء',
-            input: 'textarea',
-            inputLabel: 'سبب الرفض *',
-            inputPlaceholder: 'يرجى توضيح سبب الرفض...',
-            inputValidator: (value) => {
-                if (!value) {
-                    return 'يجب إدخال سبب الرفض';
-                }
-            },
-            showCancelButton: true,
-            confirmButtonText: 'رفض',
-            cancelButtonText: 'إلغاء',
-            confirmButtonColor: '#dc3545'
-        });
-
-        if (notes) {
-            try {
-                const result = await this.apiRequest('reject', {
-                    action_id: actionId,
-                    notes: notes
-                });
-
-                if (result.success) {
-                    this.showSuccess('تم رفض الإجراء');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    this.showError(result.message || 'فشل رفض الإجراء');
-                }
-            } catch (error) {
-                this.showError('حدث خطأ في الاتصال بالخادم');
-            }
-        }
-    }
-
-    /**
-     * Handle add comment
-     */
-    async handleAddComment(event) {
-        event.preventDefault();
-        
-        const form = event.target;
-        const formData = new FormData(form);
-        const actionId = formData.get('action_id');
-        const content = formData.get('content');
-
-        if (!content || !content.trim()) {
-            this.showError('يرجى إدخال نص التعليق');
+        if (!actions || actions.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">لا توجد إجراءات</h5>
+                </div>
+            `;
             return;
         }
-
-        try {
-            const result = await this.apiRequest('add_comment', {
-                action_id: actionId,
-                content: content.trim(),
-                comment_type: 'comment'
-            });
-
-            if (result.success) {
-                this.showSuccess('تم إضافة التعليق');
-                form.reset();
-                
-                // Reload comments section if exists
-                this.loadComments(actionId);
-            } else {
-                this.showError(result.message || 'فشل في إضافة التعليق');
-            }
-        } catch (error) {
-            this.showError('حدث خطأ في الاتصال بالخادم');
-        }
-    }
-
-    /**
-     * Load action comments
-     */
-    async loadComments(actionId) {
-        try {
-            const result = await this.apiRequest('get_comments', { action_id: actionId });
-
-            if (result.success && result.data) {
-                this.renderComments(actionId, result.data.comments);
-            }
-        } catch (error) {
-            console.error('Failed to load comments:', error);
-        }
-    }
-
-    /**
-     * Render comments
-     */
-    renderComments(actionId, comments) {
-        const container = document.querySelector(`.action-comments[data-action-id="${actionId}"]`);
-        if (!container) return;
-
-        container.innerHTML = comments.map(comment => `
-            <div class="comment mb-3">
-                <div class="d-flex justify-content-between">
-                    <strong>${this.escapeHtml(comment.user_name)}</strong>
-                    <small class="text-muted">${this.formatDateTime(comment.created_at)}</small>
+        
+        const html = actions.map(action => `
+            <div class="action-card" data-action-id="${action.id}">
+                <div class="action-header">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="action-icon ${this.getStatusColor(action.status)}">
+                            <i class="bi bi-${this.getTypeIcon(action.type)}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="action-title mb-1">${this.escapeHtml(action.title)}</h6>
+                            <div class="action-meta">
+                                <span class="badge bg-secondary">${action.action_code}</span>
+                                <span class="text-muted">${action.requester_name}</span>
+                                <span class="text-muted">${this.formatDate(action.created_at)}</span>
+                            </div>
+                        </div>
+                        <span class="badge ${this.getStatusBadgeClass(action.status)}">
+                            ${this.getStatusText(action.status)}
+                        </span>
+                    </div>
                 </div>
-                <p class="mb-0 mt-1">${this.escapeHtml(comment.content)}</p>
+                ${action.description ? `<p class="action-description">${this.escapeHtml(action.description)}</p>` : ''}
+                <div class="action-footer">
+                    <span class="badge badge-outline">${this.getTypeText(action.type)}</span>
+                    <span class="badge badge-outline">${this.getPriorityText(action.priority)}</span>
+                    ${action.assigned_name ? `<span class="text-muted"><i class="bi bi-person"></i> ${this.escapeHtml(action.assigned_name)}</span>` : ''}
+                </div>
             </div>
         `).join('');
-    }
-
-    /**
-     * Start auto-refresh for pending approvals
-     */
-    startAutoRefresh() {
-        // Refresh every 5 minutes
-        setInterval(() => {
-            this.refreshPendingCount();
-        }, 5 * 60 * 1000);
-    }
-
-    /**
-     * Refresh pending approvals count
-     */
-    async refreshPendingCount() {
-        try {
-            const result = await this.apiRequest('get_pending_count');
-
-            if (result.success && result.data) {
-                const badge = document.querySelector('.pending-approvals-badge');
-                if (badge) {
-                    badge.textContent = result.data.count;
-                    badge.style.display = result.data.count > 0 ? 'inline-block' : 'none';
+        
+        container.innerHTML = html;
+        
+        // Attach click event listeners
+        container.querySelectorAll('.action-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const actionId = parseInt(card.dataset.actionId);
+                if (actionId) {
+                    this.viewActionDetails(actionId);
                 }
+            });
+        });
+    },
+    
+    /**
+     * عرض تفاصيل إجراء
+     */
+    async viewActionDetails(actionId) {
+        this.currentActionId = actionId;
+        showLoading('جاري التحميل...');
+        
+        try {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': SARH.csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'get',
+                    id: actionId
+                })
+            });
+            
+            const result = await response.json();
+            hideLoading();
+            
+            if (result.success) {
+                this.renderActionDetails(result.data);
+                const detailsPanel = document.getElementById('actionDetailsPanel');
+                detailsPanel.classList.add('show');
+            } else {
+                showError('فشل تحميل التفاصيل');
             }
         } catch (error) {
-            console.error('Failed to refresh pending count:', error);
+            hideLoading();
+            showError('خطأ في الاتصال بالخادم');
+            console.error('Error loading action details:', error);
         }
-    }
-
+    },
+    
     /**
-     * Show success message
+     * عرض تفاصيل الإجراء
      */
-    showSuccess(message) {
-        Swal.fire({
-            icon: 'success',
-            title: 'نجح',
-            text: message,
-            confirmButtonText: 'حسناً',
-            timer: 2000
+    renderActionDetails(data) {
+        const action = data.action;
+        const comments = data.comments || [];
+        const approvals = data.approvals || [];
+        
+        document.getElementById('detailTitle').textContent = action.title;
+        document.getElementById('detailCode').textContent = action.action_code;
+        document.getElementById('detailStatus').innerHTML = `
+            <span class="badge ${this.getStatusBadgeClass(action.status)}">
+                ${this.getStatusText(action.status)}
+            </span>
+        `;
+        document.getElementById('detailDescription').textContent = action.description || 'لا يوجد وصف';
+        document.getElementById('detailRequester').textContent = action.requester_name;
+        document.getElementById('detailDate').textContent = this.formatDateTime(action.created_at);
+        
+        // عرض التعليقات
+        const timelineHtml = comments.map(comment => `
+            <div class="timeline-item">
+                <div class="timeline-marker ${comment.comment_type === 'system' ? 'bg-secondary' : 'bg-primary'}"></div>
+                <div class="timeline-content">
+                    <div class="d-flex justify-content-between">
+                        <strong>${this.escapeHtml(comment.user_name)}</strong>
+                        <small class="text-muted">${this.formatDateTime(comment.created_at)}</small>
+                    </div>
+                    <p class="mb-0">${this.escapeHtml(comment.content)}</p>
+                </div>
+            </div>
+        `).join('');
+        
+        document.getElementById('detailTimeline').innerHTML = timelineHtml || '<p class="text-muted">لا توجد تعليقات</p>';
+    },
+    
+    /**
+     * إغلاق لوحة التفاصيل
+     */
+    closeDetails() {
+        document.getElementById('actionDetailsPanel').classList.remove('show');
+        this.currentActionId = null;
+    },
+    
+    /**
+     * إضافة تعليق
+     */
+    async addComment() {
+        const content = document.getElementById('commentInput').value.trim();
+        
+        if (!content) {
+            showError('يرجى كتابة تعليق');
+            return;
+        }
+        
+        if (!this.currentActionId) {
+            showError('لم يتم تحديد إجراء');
+            return;
+        }
+        
+        showLoading('جاري الإرسال...');
+        
+        try {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': SARH.csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'add_comment',
+                    action_id: this.currentActionId,
+                    content: content
+                })
+            });
+            
+            const result = await response.json();
+            hideLoading();
+            
+            if (result.success) {
+                document.getElementById('commentInput').value = '';
+                this.viewActionDetails(this.currentActionId);
+                showSuccess('تم إضافة التعليق');
+            } else {
+                showError(result.error || 'فشل إضافة التعليق');
+            }
+        } catch (error) {
+            hideLoading();
+            showError('خطأ في الاتصال بالخادم');
+            console.error('Error adding comment:', error);
+        }
+    },
+    
+    /**
+     * تغيير حالة الإجراء
+     */
+    async changeStatus(newStatus) {
+        if (!this.currentActionId) return;
+        
+        const confirmed = await showConfirm(
+            'تأكيد التغيير',
+            'هل أنت متأكد من تغيير حالة الإجراء؟'
+        );
+        
+        if (!confirmed) return;
+        
+        showLoading('جاري الحفظ...');
+        
+        try {
+            const response = await fetch(SARH.baseUrl + '/api/actions/handler.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': SARH.csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'change_status',
+                    id: this.currentActionId,
+                    status: newStatus
+                })
+            });
+            
+            const result = await response.json();
+            hideLoading();
+            
+            if (result.success) {
+                showSuccess('تم تغيير الحالة بنجاح');
+                this.viewActionDetails(this.currentActionId);
+                this.loadStats();
+                this.loadActions();
+            } else {
+                showError(result.error || 'فشل تغيير الحالة');
+            }
+        } catch (error) {
+            hideLoading();
+            showError('خطأ في الاتصال بالخادم');
+            console.error('Error changing status:', error);
+        }
+    },
+    
+    /**
+     * ربط أحداث العناصر
+     */
+    attachEventListeners() {
+        // أزرار الفلاتر
+        document.querySelectorAll('[data-filter]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.loadActions(e.target.dataset.filter);
+            });
         });
-    }
-
-    /**
-     * Show error message
-     */
-    showError(message) {
-        Swal.fire({
-            icon: 'error',
-            title: 'خطأ',
-            text: message,
-            confirmButtonText: 'حسناً'
+        
+        // زر إغلاق التفاصيل
+        document.getElementById('closeDetailsBtn')?.addEventListener('click', () => {
+            this.closeDetails();
         });
-    }
-
-    /**
-     * Escape HTML to prevent XSS
-     */
+        
+        // زر إضافة تعليق
+        document.getElementById('addCommentBtn')?.addEventListener('click', () => {
+            this.addComment();
+        });
+        
+        // أزرار الموافقة والرفض
+        document.getElementById('approveActionBtn')?.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action) {
+                this.changeStatus(action);
+            }
+        });
+        
+        document.getElementById('rejectActionBtn')?.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action) {
+                this.changeStatus(action);
+            }
+        });
+    },
+    
+    // Helper functions
+    getStatusColor(status) {
+        const colors = {
+            'pending': 'status-pending',
+            'in_progress': 'status-progress',
+            'waiting_approval': 'status-waiting',
+            'approved': 'status-approved',
+            'completed': 'status-completed',
+            'rejected': 'status-rejected',
+            'cancelled': 'status-cancelled'
+        };
+        return colors[status] || 'status-pending';
+    },
+    
+    getStatusBadgeClass(status) {
+        const classes = {
+            'pending': 'bg-warning',
+            'in_progress': 'bg-info',
+            'waiting_approval': 'bg-primary',
+            'approved': 'bg-success',
+            'completed': 'bg-success',
+            'rejected': 'bg-danger',
+            'cancelled': 'bg-secondary'
+        };
+        return classes[status] || 'bg-secondary';
+    },
+    
+    getStatusText(status) {
+        const texts = {
+            'pending': 'قيد الانتظار',
+            'in_progress': 'قيد التنفيذ',
+            'waiting_approval': 'بانتظار الموافقة',
+            'approved': 'موافق عليه',
+            'completed': 'مكتمل',
+            'rejected': 'مرفوض',
+            'cancelled': 'ملغى'
+        };
+        return texts[status] || status;
+    },
+    
+    getTypeIcon(type) {
+        const icons = {
+            'request': 'file-earmark-text',
+            'task': 'list-check',
+            'approval': 'clipboard-check',
+            'complaint': 'exclamation-triangle',
+            'suggestion': 'lightbulb'
+        };
+        return icons[type] || 'file-text';
+    },
+    
+    getTypeText(type) {
+        const texts = {
+            'request': 'طلب',
+            'task': 'مهمة',
+            'approval': 'موافقة',
+            'complaint': 'شكوى',
+            'suggestion': 'اقتراح'
+        };
+        return texts[type] || type;
+    },
+    
+    getPriorityText(priority) {
+        const texts = {
+            'low': 'منخفضة',
+            'medium': 'متوسطة',
+            'high': 'عالية',
+            'urgent': 'عاجلة'
+        };
+        return texts[priority] || priority;
+    },
+    
+    formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('ar-SA');
+    },
+    
+    formatDateTime(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleString('ar-SA');
+    },
+    
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
+};
 
-    /**
-     * Format date and time
-     */
-    formatDateTime(datetime) {
-        const date = new Date(datetime);
-        return date.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-}
-
-// Initialize when DOM is ready
+// تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
-    window.actionsManager = new ActionsManager();
+    if (document.getElementById('actionsApp')) {
+        ActionsApp.init();
+    }
 });

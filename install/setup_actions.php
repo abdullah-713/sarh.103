@@ -62,6 +62,21 @@ try {
         }
     }
     
+    // Add action_id column to leaves table if it doesn't exist
+    try {
+        $checkColumn = Database::fetchOne("SHOW COLUMNS FROM leaves LIKE 'action_id'");
+        if (!$checkColumn) {
+            Database::query("ALTER TABLE leaves ADD COLUMN action_id INT UNSIGNED NULL AFTER status");
+            Database::query("ALTER TABLE leaves ADD INDEX idx_action_id (action_id)");
+            $executed++;
+        }
+    } catch (PDOException $e) {
+        $errors[] = [
+            'statement' => 'ALTER TABLE leaves ADD action_id',
+            'error' => $e->getMessage()
+        ];
+    }
+    
     // Log activity
     log_activity(
         'system_setup',
