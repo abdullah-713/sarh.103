@@ -245,6 +245,30 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
         <span>التقارير</span>
     </a>
     
+    <!-- الإجراءات -->
+    <a href="<?= url('actions.php') ?>" class="nav-item <?= $currentPage === 'actions' ? 'active' : '' ?>">
+        <i class="bi bi-clipboard-check<?= $currentPage === 'actions' ? '-fill' : '' ?>"></i>
+        <span>الإجراءات</span>
+        <?php 
+        // عدد الإجراءات المعلقة
+        if (is_logged_in()) {
+            try {
+                $pendingActionsCount = Database::fetchValue(
+                    "SELECT COUNT(*) FROM actions WHERE (requester_id = ? OR current_approver_id = ?) AND status IN ('pending', 'waiting_approval') AND deleted_at IS NULL",
+                    [current_user_id(), current_user_id()]
+                ) ?? 0;
+                if ($pendingActionsCount > 0): 
+        ?>
+        <span class="badge bg-danger" style="position:absolute;top:8px;right:8px;font-size:0.65rem;padding:2px 5px;border-radius:10px;"><?= $pendingActionsCount > 99 ? '99+' : $pendingActionsCount ?></span>
+        <?php 
+                endif;
+            } catch (Exception $e) {
+                // تجاهل الأخطاء
+            }
+        }
+        ?>
+    </a>
+    
     <!-- المزيد -->
     <a href="<?= url('more.php') ?>" class="nav-item <?= $currentPage === 'more' ? 'active' : '' ?>">
         <i class="bi bi-grid<?= $currentPage === 'more' ? '-fill' : '' ?>"></i>
