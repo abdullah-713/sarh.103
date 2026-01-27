@@ -27,6 +27,9 @@ echo "<h1>🔄 إعادة تعيين المستخدمين</h1>";
 try {
     $pdo = Database::getInstance();
     
+    // بدء معاملة لضمان سلامة العملية
+    $pdo->beginTransaction();
+    
     // حذف جميع المستخدمين
     echo "<div class='info'>⏳ جاري حذف المستخدمين الحاليين...</div>";
     
@@ -132,9 +135,16 @@ try {
     
     echo "<div class='success' style='font-size:18px;margin-top:20px;'>🎉 تم إنشاء المستخدمين بنجاح!</div>";
     
+    // تأكيد المعاملة
+    $pdo->commit();
+    
     echo "<a href='../login.php' class='btn'>🔐 الذهاب لصفحة تسجيل الدخول</a>";
     
 } catch (Exception $e) {
+    // التراجع عن المعاملة في حالة الخطأ
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo "<div class='error'>❌ خطأ: " . $e->getMessage() . "</div>";
 }
 
