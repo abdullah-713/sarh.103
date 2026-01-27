@@ -275,7 +275,13 @@ function format_arabic_date($date) {
         5 => 'مايو', 6 => 'يونيو', 7 => 'يوليو', 8 => 'أغسطس',
         9 => 'سبتمبر', 10 => 'أكتوبر', 11 => 'نوفمبر', 12 => 'ديسمبر'
     ];
-    // Format implementation...
+    
+    $timestamp = is_numeric($date) ? $date : strtotime($date);
+    $day = date('j', $timestamp);
+    $month = $arabic_months[(int)date('n', $timestamp)];
+    $year = date('Y', $timestamp);
+    
+    return "{$day} {$month} {$year}";
 }
 ```
 
@@ -350,9 +356,15 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 // Validate required fields
 $required = ['email', 'password', 'full_name_ar'];
+$field_labels = [
+    'email' => 'البريد الإلكتروني',
+    'password' => 'كلمة المرور',
+    'full_name_ar' => 'الاسم الكامل'
+];
 foreach ($required as $field) {
     if (empty($_POST[$field])) {
-        die_with_error("الحقل {$field} مطلوب");
+        $label = $field_labels[$field] ?? $field;
+        die_with_error("{$label} مطلوب");
     }
 }
 ```
@@ -384,19 +396,34 @@ session_regenerate_id(true);
 // Store user IP for validation
 $_SESSION['user_ip'] = $_SERVER['REMOTE_ADDR'];
 
-// Check session validity
-if ($_SESSION['user_ip'] !== $_SERVER['REMOTE_ADDR']) {
-    session_destroy();
-    redirect_to('/login.php');
+// Check session validity (optional - may cause issues with VPNs/load balancers)
+// Note: IP validation can cause legitimate users to be logged out when IP changes
+// Consider using user agent fingerprinting or disabling for mobile users
+if (isset($_SESSION['user_ip']) && $_SESSION['user_ip'] !== $_SERVER['REMOTE_ADDR']) {
+    // Log suspicious activity instead of immediate logout
+    log_activity('session_ip_mismatch', 0, 'IP changed from ' . $_SESSION['user_ip'] . ' to ' . $_SERVER['REMOTE_ADDR']);
+    // Optionally: require re-authentication for sensitive operations
 }
 ```
 
 ### File Upload Security
 ```php
-// Validate file types
-$allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-if (!in_array($_FILES['avatar']['type'], $allowed_types)) {
+// Validate file types (use server-side validation, not client MIME type)
+$allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+$file_extension = strtolower(pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION));
+
+if (!in_array($file_extension, $allowed_extensions)) {
     die_with_error('نوع الملف غير مسموح به');
+}
+
+// Additional validation: check actual file content
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$mime_type = finfo_file($finfo, $_FILES['avatar']['tmp_name']);
+finfo_close($finfo);
+
+$allowed_mimes = ['image/jpeg', 'image/png', 'image/gif'];
+if (!in_array($mime_type, $allowed_mimes)) {
+    die_with_error('نوع الملف غير صالح');
 }
 
 // Validate file size (max 5MB)
@@ -408,8 +435,16 @@ if ($_FILES['avatar']['size'] > 5 * 1024 * 1024) {
 $extension = pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
 $filename = uniqid() . '.' . $extension;
 
-// Store outside web root or with .htaccess protection
-move_uploaded_file($_FILES['avatar']['tmp_name'], '/uploads/' . $filename);
+// IMPORTANT: Store uploads with proper security
+// Option 1: Store outside web root (recommended)
+$upload_dir = dirname(__DIR__) . '/uploads/'; // Outside public directory
+
+// Option 2: If storing in public directory, ensure .htaccess prevents execution
+// Add to /uploads/.htaccess:
+// php_flag engine off
+// AddType application/octet-stream .php .phtml .php3 .php4 .php5
+
+move_uploaded_file($_FILES['avatar']['tmp_name'], $upload_dir . $filename);
 ```
 
 ## Progressive Web App (PWA)
@@ -426,9 +461,12 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
         // Subscribe to push notifications
+        // Note: Replace with your actual VAPID public key from the config
+        // Generate VAPID keys: https://www.npmjs.com/package/web-push#command-line
+        const vapidPublicKey = 'YOUR_VAPID_PUBLIC_KEY'; // TODO: Get from server config
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: 'YOUR_VAPID_PUBLIC_KEY'
+            applicationServerKey: vapidPublicKey
         });
     }
 }
@@ -622,6 +660,18 @@ switch ($action) {
 ```php
 // In production, set in hosting panel or .env file
 // DO NOT commit sensitive data to git
+
+// IMPORTANT: Fail explicitly if required env vars are missing in production
+if (getenv('APP_ENV') === 'production') {
+    $required_env = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS'];
+    foreach ($required_env as $var) {
+        if (!getenv($var)) {
+            die("Configuration error: {$var} environment variable is not set");
+        }
+    }
+}
+
+// Use environment variables with safe defaults for development only
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'u307296675_101');
 define('DB_USER', getenv('DB_USER') ?: 'root');
